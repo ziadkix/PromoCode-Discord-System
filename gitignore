@@ -1,0 +1,6 @@
+node_modules/
+.env
+promo-data.json
+promo-data.json.tmp
+*.log
+.DS_Store

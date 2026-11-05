@@ -1,0 +1,16 @@
+{
+  "name": "promocode-discord-system",
+  "version": "1.0.0",
+  "description": "Discord bot for tracking promo codes in support tickets with view-only owner access, commissions and reports.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["discord", "discord-bot", "promo-code", "tickets", "discord.js"],
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "discord.js": "^14.16.0",
+    "dotenv": "^16.4.5"
+  }
+}
