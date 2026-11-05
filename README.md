@@ -81,7 +81,7 @@ All data is saved to `promo-data.json` next to the bot. Back this file up if you
 ## Security notes
 
 - Never commit your `.env` file or share your bot token. If it leaks, reset it in the Developer Portal.
-- Only members with **Manage Server** can create codes, settle tickets, view reports or delete data
+- Only members with **Manage Server** can create codes, settle tickets, view reports or delete data.
 
 ## License
 
