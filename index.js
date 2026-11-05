@@ -7,6 +7,10 @@ const {
   Events,
   GatewayIntentBits,
   PermissionFlagsBits,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  MessageFlags,
 } = require('discord.js');
 
 const token = process.env.DISCORD_TOKEN;
@@ -330,7 +334,21 @@ async function confirmRemoval(message, action) {
   }
 }
 
-function getReportText(guildData, date = null) {
+function makeReportCard(title, body, color = 0x5865F2) {
+  return new ContainerBuilder()
+    .setAccentColor(color)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(title),
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(1),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(body),
+    );
+}
+
+function getReportComponents(guildData, date = null) {
   const promos = Object.entries(guildData.promos ?? {});
   const tickets = Object.values(guildData.tickets ?? {});
   const settlements = tickets.filter((ticket) => (
@@ -363,55 +381,59 @@ function getReportText(guildData, date = null) {
   const cutCents = settlements.reduce((sum, ticket) => sum + ticket.commissionCents, 0);
   const allUses = promoRows.reduce((sum, row) => sum + row.uses.length, 0);
   const money = (cents) => `$${(cents / 100).toFixed(2)}`;
-  const lines = [
-    date ? `Promo stats — ${date} (12pm–12am Cairo time)` : 'Promo stats so far',
-    `${promoRows.length} code${promoRows.length === 1 ? '' : 's'} · ${allUses} use${allUses === 1 ? '' : 's'}`,
-    `Tickets: ${money(totalCents)} · Promo cuts: ${money(cutCents)}`,
+  const reportCards = [
+    makeReportCard(
+      date ? `Promo stats · ${date}` : 'Promo stats · all time',
+      [
+        date ? 'Today, noon to midnight (Cairo time)' : 'Everything saved so far',
+        '',
+        `**${promoRows.length}** code${promoRows.length === 1 ? '' : 's'}  ·  `
+          + `**${allUses}** use${allUses === 1 ? '' : 's'}`,
+        `Tickets: **${money(totalCents)}**`,
+        `Promo owners’ cut: **${money(cutCents)}**`,
+        !promoRows.length
+          ? `\n${date ? 'No promo activity in this time window.' : 'No promo codes yet.'}`
+          : '',
+      ].filter(Boolean).join('\n'),
+    ),
   ];
 
-  if (!promoRows.length) {
-    lines.push('', date ? 'Nothing to report for today.' : 'No promo codes have been made yet.');
-  } else {
-    lines.push('', 'Codes');
-    for (const row of promoRows) {
-      const owner = row.promo.ownerId ? `<@${row.promo.ownerId}>` : 'no owner';
-      const fresh = row.createdToday ? ' · made today' : '';
-      lines.push(
-        `+${row.code}${fresh} — ${owner}`,
-        `  ${row.uses.length} use${row.uses.length === 1 ? '' : 's'} · `
-          + `${row.codeSettlements.length} ticket${row.codeSettlements.length === 1 ? '' : 's'}`
-          + ` · ${money(row.ticketCents)} sales · ${money(row.cutCents)} earned`,
-      );
-    }
+  for (const row of promoRows) {
+    const owner = row.promo.ownerId ? `<@${row.promo.ownerId}>` : 'No owner linked';
+    const newCode = row.createdToday ? ' · new today' : '';
+    reportCards.push(makeReportCard(
+      `+${row.code}${newCode}`,
+      [
+        `Owner: ${owner}`,
+        `Uses: **${row.uses.length}**`,
+        `Tickets: **${row.codeSettlements.length}** · Sales: **${money(row.ticketCents)}**`,
+        `Their cut: **${money(row.cutCents)}**`,
+      ].join('\n'),
+      0x2B2D31,
+    ));
   }
 
   if (!date) {
-    const balances = Object.entries(guildData.balances ?? {});
-    if (balances.length) {
-      lines.push('', 'Balances');
-      for (const [userId, cents] of balances) {
-        lines.push(`<@${userId}> — ${money(cents)}`);
-      }
+    for (const [userId, cents] of Object.entries(guildData.balances ?? {})) {
+      reportCards.push(makeReportCard(
+        'Balance',
+        `<@${userId}>\n**${money(cents)}**`,
+        0x57F287,
+      ));
     }
   }
 
-  return lines;
+  return reportCards;
 }
 
 async function sendReport(channel, guildData, date = null) {
-  let chunk = '';
-  for (const line of getReportText(guildData, date)) {
-    const next = chunk ? `${chunk}\n${line}` : line;
-    if (next.length > 1900) {
-      await channel.send({ content: chunk, allowedMentions: { parse: [] } });
-      chunk = line;
-    } else {
-      chunk = next;
-    }
-  }
-
-  if (chunk) {
-    await channel.send({ content: chunk, allowedMentions: { parse: [] } });
+  const cards = getReportComponents(guildData, date);
+  for (let i = 0; i < cards.length; i += 10) {
+    await channel.send({
+      components: cards.slice(i, i + 10),
+      flags: MessageFlags.IsComponentsV2,
+      allowedMentions: { parse: [] },
+    });
   }
 }
 
